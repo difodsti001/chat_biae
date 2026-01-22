@@ -13,6 +13,8 @@ from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 from docx import Document
+from datetime import datetime
+import pytz
 import tiktoken
 
 # ==============================
@@ -78,7 +80,9 @@ def crear_tabla_interacciones():
             respuesta TEXT NOT NULL,
             tokens_mensaje INT DEFAULT 0,
             tokens_respuesta INT DEFAULT 0,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            timestamp_mensaje TIMESTAMPZ DEFAULT CURRENT_TIMESTAMP,
+            timestamp_respuesta TIMESTAMPZ DEFAULT CURRENT_TIMESTAMP,
+            latencia_ms INT DEFAULT 0       
         );
     """)
     conn.commit()
@@ -409,6 +413,9 @@ async def chat(request: ChatRequest):
     conn = None 
     cursor = None
     
+    lima_tz = pytz.timezone('America/Lima')
+    timestamp_mensaje = datetime.now(lima_tz)
+    
     try:
         relevant_chunks = search_qdrant(
             collection_name=request.collection_name,
@@ -439,10 +446,14 @@ async def chat(request: ChatRequest):
             temperature=0.4
         )
         answer = response.choices[0].message.content.strip()
+        timestamp_respuesta = datetime.now(lima_tz)
 
-        # Contar tokens reales: prompt completo enviado a OpenAI
+
         tokens_mensaje = contar_tokens(prompt)
         tokens_respuesta = contar_tokens(answer)
+
+        latencia_ms = int((timestamp_respuesta - timestamp_mensaje).total_seconds() * 1000)
+
 
         try:
             conn = get_db_connection()
@@ -455,15 +466,18 @@ async def chat(request: ChatRequest):
             
             cursor.execute("""
                 INSERT INTO public.interacciones_cursos
-                (curso, usuario, mensaje, respuesta, tokens_mensaje, tokens_respuesta)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                (curso, usuario, mensaje, respuesta, tokens_mensaje, tokens_respuesta, timestamp_mensaje, timestamp_respuesta, latencia_ms)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 collection_safe,
                 usuario_safe,
                 mensaje_safe,
                 respuesta_safe,
                 tokens_mensaje,
-                tokens_respuesta
+                tokens_respuesta,
+                timestamp_mensaje,
+                timestamp_respuesta,
+                latencia_ms
             ))
             conn.commit()
             print(f"✅ Interacción guardada: {usuario_safe} - {tokens_mensaje + tokens_respuesta} tokens")
