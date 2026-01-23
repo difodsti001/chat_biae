@@ -413,9 +413,6 @@ async def chat(request: ChatRequest):
     conn = None 
     cursor = None
     
-    lima_tz = pytz.timezone('America/Lima')
-    timestamp_mensaje = datetime.now(lima_tz)
-    
     try:
         relevant_chunks = search_qdrant(
             collection_name=request.collection_name,
@@ -438,6 +435,8 @@ async def chat(request: ChatRequest):
             context=context, 
             question=request.message
         )
+        lima_tz = pytz.timezone("America/Lima")
+        timestamp_mensaje = datetime.now(lima_tz)
         
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
