@@ -314,7 +314,7 @@ def formatear_chunk_para_contexto(chunk: Dict) -> str:
 
     ubicacion = f"Chunk {chunk_num}/{total_chunks}" if total_chunks > 0 else f"Chunk {chunk_num}"
 
-    return f"""[{filename} – {ubicacion}]
+    return f"""[{filename}]  #– {ubicacion}
 {text}
 """
 
